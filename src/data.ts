@@ -54,3 +54,9 @@ export const fileStructure: FileNode[] = [
     ],
   },
 ];
+
+export const homePageMsg = {
+  title: "Hello It is Munkh-Erdene.",
+  text: "I wanted to let you know that although I was assigned tasks for the Junior and Middleweight roles, I've invested a bit more time on them than initially discussed. My intention was not only to meet the requirements but also to showcase the quality of my work and my dedication. I thoroughly enjoyed delving deeper into the tasks and hope my additional efforts will demonstrate my capabilities effectively.",
+  end: "Looking forward to your feedback. Have a wonderful day!",
+};

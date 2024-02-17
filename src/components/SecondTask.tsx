@@ -1,95 +1,134 @@
 import {
   Box,
+  Button,
   Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
-  TableHead,
   TableRow,
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import NavBar from "./NavBar";
-import { type } from "os";
+import TableHeader from "./TableHeader";
+
+type employee = {
+  firstName: string;
+  id: string;
+  lastName: string;
+};
+
+export type absenceType = {
+  absenceType: string;
+  approved: boolean;
+  days: number;
+  employee: employee;
+  id: number;
+  startDate: string;
+  conflicts?: boolean;
+};
 
 const SecondTask: React.FC = () => {
-  type employee = {
-    firstName: string;
-    id: string;
-    lastName: string;
-  };
+  const [absenceList, setAbsenceList] = useState<absenceType[]>();
 
-  type data = {
-    absenceType: string;
-    approved: boolean;
-    days: number;
-    employee: employee;
-    id: number;
-    startDate: string;
-  };
-  const [stories, setStory] = useState<data[]>();
   useEffect(() => {
     fetch("https://front-end-kata.brighthr.workers.dev/api/absences")
       .then((res) => res.json())
-      .then((data) => {
-        setTimeout(() => setStory(data), 1500);
-        console.log("Success ", data);
+      .then((data: absenceType[]) => {
+        setTimeout(() => setAbsenceList(data), 1500);
       })
       .catch((error) => {
         console.log("Error", error);
       });
   }, []);
-  console.log(stories);
+  useEffect(() => {
+    if (absenceList) {
+      absenceList.forEach((item) => {
+        fetch(
+          `https://front-end-kata.brighthr.workers.dev/api/conflict/${item.id}`
+        )
+          .then((res) => res.json())
+          .then((data) => {
+            setTimeout(() => (item.conflicts = data.conflicts), 1500);
+          })
+          .catch((error) => {
+            console.log("Error", error);
+          });
+      });
+    }
+  }, [absenceList]);
+
+  const [filterName, setFilterName] = useState("");
+  const [order, setOrder] = useState<"asc" | "desc">("asc");
+  const [orderBy, setOrderBy] = useState("");
+  const handleClick = (e: any) => {
+    setFilterName(e.target.textContent);
+  };
+
+  const visibleRows = React.useMemo(
+    () => absenceList && sortByFn(absenceList, order, orderBy),
+    [absenceList, order, orderBy]
+  );
   return (
     <Box>
       <Box>
         <NavBar />
       </Box>
-      <Box sx={{ display: "flex" }}>
+      <Box sx={{ display: "flex", flexDirection: "column" }}>
         <TableContainer component={Paper}>
           <Table sx={{ minWidth: 650 }} aria-label="simple table">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: "bold" }}>Employee name</TableCell>
-                <TableCell align="right" sx={{ fontWeight: "bold" }}>
-                  Absence type
-                </TableCell>
-                <TableCell align="right" sx={{ fontWeight: "bold" }}>
-                  Approved
-                </TableCell>
-                <TableCell align="right" sx={{ fontWeight: "bold" }}>
-                  Start date
-                </TableCell>
-                <TableCell align="right" sx={{ fontWeight: "bold" }}>
-                  End date
-                </TableCell>
-              </TableRow>
-            </TableHead>
+            <TableHeader
+              orderBy={orderBy}
+              order={order}
+              setOrderBy={setOrderBy}
+              setOrder={setOrder}
+            />
             <TableBody>
-              {stories &&
-                stories.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-                  >
-                    <TableCell component="th" scope="row">
-                      {`${row.employee.firstName} ${row.employee.lastName}`}
-                    </TableCell>
-                    <TableCell align="right">{row.absenceType}</TableCell>
-                    <TableCell align="right">
-                      {row.approved ? "approved" : "pending approval"}
-                    </TableCell>
-                    <TableCell align="right">
-                      {dateFormatter(row.startDate)}
-                    </TableCell>
-                    <TableCell align="right">
-                      {getEndDate(row.startDate, row.days)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+              {visibleRows &&
+                visibleRows
+                  .filter((item) => {
+                    if (filterName === "") {
+                      return true;
+                    } else {
+                      return (
+                        `${item.employee.firstName} ${item.employee.lastName}` ===
+                        filterName
+                      );
+                    }
+                  })
+                  .map((row) => (
+                    <TableRow
+                      key={row.id}
+                      sx={{
+                        "&:last-child td, &:last-child th": { border: 0 },
+                      }}
+                    >
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{ color: row.conflicts ? "red" : "black" }}
+                        onClick={handleClick}
+                      >
+                        {`${row.employee.firstName} ${row.employee.lastName}`}
+                      </TableCell>
+                      <TableCell align="right">{row.absenceType}</TableCell>
+                      <TableCell align="right">
+                        {row.approved ? "approved" : "pending approval"}
+                      </TableCell>
+                      <TableCell align="right">
+                        {dateFormatter(row.startDate)}
+                      </TableCell>
+                      <TableCell align="right">
+                        {getEndDate(row.startDate, row.days)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
             </TableBody>
           </Table>
         </TableContainer>
+        {filterName !== "" && (
+          <Button onClick={() => setFilterName("")}>Back</Button>
+        )}
       </Box>
     </Box>
   );
@@ -111,4 +150,36 @@ const getEndDate = (startDateStr: string, durationDays: number): string => {
   const endDateStr = dateFormatter(endDate.toDateString());
 
   return endDateStr;
+};
+
+export const sortByFn = (
+  records: absenceType[],
+  order: "asc" | "desc" = "asc",
+  orderBy: string
+): absenceType[] => {
+  return records.sort((a, b) => {
+    let keyA: string;
+    let keyB: string;
+    // default sort by full name
+    switch (orderBy) {
+      case "Start date":
+        keyA = a.startDate;
+        keyB = b.startDate;
+        break;
+      case "Absence type":
+        keyA = a.absenceType;
+        keyB = b.absenceType;
+        break;
+      default:
+        keyA = `${a.employee.firstName} ${a.employee.lastName}`;
+        keyB = `${b.employee.firstName} ${b.employee.lastName}`;
+        break;
+    }
+
+    if (order === "asc") {
+      return keyA.localeCompare(keyB);
+    } else {
+      return keyB.localeCompare(keyA);
+    }
+  });
 };
